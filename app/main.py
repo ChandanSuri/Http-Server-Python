@@ -1,11 +1,16 @@
 import socket
 from enum import Enum
 import threading
+import sys
 
 class Response(Enum):
     OK = "HTTP/1.1 200 OK\r\n"
     NOT_FOUND = "HTTP/1.1 404 Not Found\r\n\r\n"
     ECHO = "HTTP/1.1 200 OK\r\n"
+
+class ContentType(Enum):
+    PLAIN_TEXT = "Content-Type: text/plain"
+    APP_FILE = "Content-Type: application/octet-stream"
 
 def parseRequestParams(requestParams):
     headers, body = {}, {}
@@ -42,15 +47,27 @@ def handleRequest(connection, address):
     requestLine, headers, body = parseRequestParams(requestParams)
     requestURL = requestLine["requestUrl"]
 
-    response = f"{Response.NOT_FOUND.value}" if requestURL != "/" else f"{Response.OK.value}\r\n"
-    if "echo" in requestURL:
+    if requestURL == "/":
+        response = f"{Response.OK.value}\r\n"
+    elif requestURL.startswith("/echo"):
         data = requestURL.strip("/").split("/")[1]
-        response = f"{Response.ECHO.value}Content-Type: text/plain\r\nContent-Length: {len(data)}\r\n\r\n{data}"
-    elif "/user-agent" == requestURL:
+        response = f"{Response.ECHO.value}{ContentType.PLAIN_TEXT.value}\r\nContent-Length: {len(data)}\r\n\r\n{data}"
+    elif requestURL.startswith("/user-agent"):
         if "User-Agent" not in headers:
             raise Exception("For /user-agent Endpoint, User Agent header is missing!")
         userAgentHeader = headers["User-Agent"]
-        response = f"{Response.OK.value}Content-Type: text/plain\r\nContent-Length: {len(userAgentHeader)}\r\n\r\n{userAgentHeader}"
+        response = f"{Response.OK.value}{ContentType.PLAIN_TEXT.value}\r\nContent-Length: {len(userAgentHeader)}\r\n\r\n{userAgentHeader}"
+    elif requestURL.startswith("/files"):
+        directoryName = sys.argv[2]
+        fileName = requestURL[7:]
+        try:
+            with open(f"/{directoryName}/{fileName}", "r") as file:
+                fileContents = file.read()
+            response = f"{Response.OK.value}{ContentType.APP_FILE.value}\r\nContent-Length: {len(fileContents)}\r\n\r\n{fileContents}"
+        except Exception as e:
+            response = f"{Response.NOT_FOUND.value}"
+    else:
+        response = f"{Response.NOT_FOUND.value}"
 
     connection.sendall(str.encode(response))
 
