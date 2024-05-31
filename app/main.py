@@ -32,8 +32,8 @@ def parseRequestParams(requestParams):
             headerEndIdx = idx
             break
 
-        headerParamsList = headerParam.split(" ")
-        headers[headerParamsList[0].strip(":")] = headerParamsList[1]
+        headerParamsList = headerParam.split(": ")
+        headers[headerParamsList[0]] = headerParamsList[1]
 
     bodyIdx = headerEndIdx + 1
     body = ""
