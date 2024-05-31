@@ -6,7 +6,6 @@ import sys
 class Response(Enum):
     OK = "HTTP/1.1 200 OK\r\n"
     NOT_FOUND = "HTTP/1.1 404 Not Found\r\n\r\n"
-    ECHO = "HTTP/1.1 200 OK\r\n"
     CREATED = "HTTP/1.1 201 Created\r\n\r\n"
 
 class ContentType(Enum):
@@ -53,7 +52,15 @@ def handleRequest(connection, address):
         response = f"{Response.OK.value}\r\n"
     elif requestURL.startswith("/echo"):
         data = requestURL.strip("/").split("/")[1]
-        response = f"{Response.ECHO.value}{ContentType.PLAIN_TEXT.value}\r\nContent-Length: {len(data)}\r\n\r\n{data}"
+        if "Accept-Encoding" in headers:
+            acceptedEncodings = headers["Accept-Encoding"].split(", ")
+            if any(map(lambda enc: enc == "gzip", acceptedEncodings)):
+                response = f"{Response.OK.value}Content-Encoding: gzip\r\n" + \
+                    f"{ContentType.PLAIN_TEXT.value}\r\nContent-Length: {len(data)}\r\n\r\n{data}"
+            else:
+                response = f"{Response.OK.value}{ContentType.PLAIN_TEXT.value}\r\nContent-Length: {len(data)}\r\n\r\n{data}"
+        else:
+            response = f"{Response.OK.value}{ContentType.PLAIN_TEXT.value}\r\nContent-Length: {len(data)}\r\n\r\n{data}"
     elif requestURL.startswith("/user-agent"):
         if "User-Agent" not in headers:
             raise Exception("For /user-agent Endpoint, User Agent header is missing!")
