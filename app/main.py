@@ -7,13 +7,14 @@ class Response(Enum):
     OK = "HTTP/1.1 200 OK\r\n"
     NOT_FOUND = "HTTP/1.1 404 Not Found\r\n\r\n"
     ECHO = "HTTP/1.1 200 OK\r\n"
+    CREATED = "HTTP/1.1 201 Created\r\n\r\n"
 
 class ContentType(Enum):
     PLAIN_TEXT = "Content-Type: text/plain"
     APP_FILE = "Content-Type: application/octet-stream"
 
 def parseRequestParams(requestParams):
-    headers, body = {}, {}
+    headers = {}
 
     requestLineParams = requestParams[0].split(" ")
     if len(requestLineParams) < 3:
@@ -36,8 +37,9 @@ def parseRequestParams(requestParams):
         headers[headerParamsList[0].strip(":")] = headerParamsList[1]
 
     bodyIdx = headerEndIdx + 1
+    body = ""
     if requestParams[bodyIdx] != '':
-        body['body'] = requestParams[bodyIdx]
+        body = requestParams[bodyIdx]
 
     return requestLine, headers, body
 
@@ -60,12 +62,24 @@ def handleRequest(connection, address):
     elif requestURL.startswith("/files"):
         directoryName = sys.argv[2]
         fileName = requestURL[7:]
-        try:
-            with open(f"/{directoryName}/{fileName}", "r") as file:
-                fileContents = file.read()
-            response = f"{Response.OK.value}{ContentType.APP_FILE.value}\r\nContent-Length: {len(fileContents)}\r\n\r\n{fileContents}"
-        except Exception as e:
-            response = f"{Response.NOT_FOUND.value}"
+        requestType = requestLine["requestType"]
+        if requestType.upper() == "GET":
+            try:
+                with open(f"/{directoryName}/{fileName}", "r") as file:
+                    fileContents = file.read()
+                response = f"{Response.OK.value}{ContentType.APP_FILE.value}\r\nContent-Length: {len(fileContents)}\r\n\r\n{fileContents}"
+            except Exception as e:
+                response = f"{Response.NOT_FOUND.value}"
+        elif requestType.upper() == "POST":
+            try:
+                print(directoryName, fileName)
+                with open(f"{directoryName}{fileName}", "w") as outFile:
+                    fileContents = outFile.write(body)
+                response = f"{Response.CREATED.value}"
+            except Exception as e:
+                response = f"{Response.NOT_FOUND.value}"
+        else:
+            raise Exception(f"{requestType} not supported for a file!!!")
     else:
         response = f"{Response.NOT_FOUND.value}"
 
